@@ -26,7 +26,7 @@ void compute_md5(my_size transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ]) {
     
     print_md5(result);
 }
-
+// align array to 64 bytes
 my_size array[ARRAY_SZ];
 my_size transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ];
 
@@ -54,8 +54,29 @@ inline void store_bit(my_size *num_ptr, int i, my_size bit_val) {
 void transpose_array_new(my_size * array){
     for (int i = 0; i < ARRAY_SZ; i++) {
         for (int j = 0; j < TRANSPOSE_SZ; j++) {
-            if(get_bit(&array[i], j)){
-                store_bit(&transpose_array[j][i/TRANSPOSE_SZ], i%TRANSPOSE_SZ, 1);
+                store_bit(&transpose_array[j][i/TRANSPOSE_SZ], i%TRANSPOSE_SZ, get_bit(&array[i], j));
+        }
+    }
+}
+
+#define PREFETCH_DISTANCE (64)
+// // by far the best
+void transpose_array_old(my_size *array) {
+    int block_sz_i = 4; // Pick a suitable block size
+    int block_sz_j = 2; // Pick a suitable block size
+
+    for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
+        for (int bj = 0; bj < ARRAY_SZ; bj += block_sz_j) {
+            // prefetch the next block of array
+            if (bi + PREFETCH_DISTANCE / TRANSPOSE_SZ < TRANSPOSE_SZ) {
+                _mm_prefetch((const char*)&transpose_array[bi][(bj / TRANSPOSE_SZ) + (PREFETCH_DISTANCE / TRANSPOSE_SZ)], _MM_HINT_T0);
+            }
+            for (int i = bi; i < bi + block_sz_i && i < TRANSPOSE_SZ; ++i) {
+                for (int j = bj; j < bj + block_sz_j && j < ARRAY_SZ; j+=1) {
+                    if(get_bit(&array[j], i)){
+                        store_bit(&transpose_array[i][j / TRANSPOSE_SZ], j % TRANSPOSE_SZ, 1);
+                    }
+                }
             }
         }
     }
@@ -65,9 +86,7 @@ void transpose_array_new(my_size * array){
 //     // outer loop over bits, inner loop over array elements
 //     for (int i = 0; i < TRANSPOSE_SZ; i++) {
 //         for (int j = 0; j < ARRAY_SZ; j++) {
-//             if(get_bit(&array[j], i)){
-//                 store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, 1);
-//             }
+//                 store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, get_bit(&array[j], i));
 //         }
 //     }
 // }
@@ -188,27 +207,7 @@ void transpose_array_new(my_size * array){
 //     }
 // }
 
-#define PREFETCH_DISTANCE (64)
-// by far the best
-void transpose_array_old(my_size *array) {
-    int block_sz_i = 4; // Pick a suitable block size
-    int block_sz_j = 2; // Pick a suitable block size
 
-    for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
-        for (int bj = 0; bj < ARRAY_SZ; bj += block_sz_j) {
-            if (bi + PREFETCH_DISTANCE / TRANSPOSE_SZ < TRANSPOSE_SZ) {
-                _mm_prefetch((const char*)&transpose_array[bi][(bj / TRANSPOSE_SZ) + (PREFETCH_DISTANCE / TRANSPOSE_SZ)], _MM_HINT_T0);
-            }
-            for (int i = bi; i < bi + block_sz_i && i < TRANSPOSE_SZ; ++i) {
-                for (int j = bj; j < bj + block_sz_j && j < ARRAY_SZ; j+=1) {
-                    if(get_bit(&array[j], i)){
-                        store_bit(&transpose_array[i][j / TRANSPOSE_SZ], j % TRANSPOSE_SZ, 1);
-                    }
-                }
-            }
-        }
-    }
-}
 // void transpose_array_old(my_size *array) {
 //     int block_sz_i = 2; // Pick a suitable block size
 //     for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
