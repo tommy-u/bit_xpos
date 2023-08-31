@@ -7,6 +7,7 @@
 
 #define ARRAY_SZ 1048576 * 8
 #define TRANSPOSE_SZ 64
+typedef uint64_t my_size; 
 
 void print_md5(unsigned char *digest) {
     char mdString[33];
@@ -17,7 +18,7 @@ void print_md5(unsigned char *digest) {
 }
 
 // IDK if I did this right, but it seems to work
-void compute_md5(uint64_t transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ]) {
+void compute_md5(my_size transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ]) {
     unsigned char result[MD5_DIGEST_LENGTH];
     
     // Assuming the transpose_array is a contiguous block of memory, which it should be in C
@@ -25,8 +26,6 @@ void compute_md5(uint64_t transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ]) 
     
     print_md5(result);
 }
-
-typedef uint64_t my_size; 
 
 my_size array[ARRAY_SZ];
 my_size transpose_array[TRANSPOSE_SZ][ARRAY_SZ/TRANSPOSE_SZ];
@@ -55,19 +54,23 @@ inline void store_bit(my_size *num_ptr, int i, my_size bit_val) {
 void transpose_array_new(my_size * array){
     for (int i = 0; i < ARRAY_SZ; i++) {
         for (int j = 0; j < TRANSPOSE_SZ; j++) {
-            store_bit(&transpose_array[j][i/TRANSPOSE_SZ], i%TRANSPOSE_SZ, get_bit(&array[i], j));
+            if(get_bit(&array[i], j)){
+                store_bit(&transpose_array[j][i/TRANSPOSE_SZ], i%TRANSPOSE_SZ, 1);
+            }
         }
     }
 }
 
-void transpose_array_old(my_size * array){
-    // outer loop over bits, inner loop over array elements
-    for (int i = 0; i < TRANSPOSE_SZ; i++) {
-        for (int j = 0; j < ARRAY_SZ; j++) {
-            store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, get_bit(&array[j], i));
-        }
-    }
-}
+// void transpose_array_old(my_size * array){
+//     // outer loop over bits, inner loop over array elements
+//     for (int i = 0; i < TRANSPOSE_SZ; i++) {
+//         for (int j = 0; j < ARRAY_SZ; j++) {
+//             if(get_bit(&array[j], i)){
+//                 store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, 1);
+//             }
+//         }
+//     }
+// }
 
 // This was a shot in the dark, didn't really expect it to work
 // void transpose_array_new(my_size * array){
@@ -186,19 +189,21 @@ void transpose_array_old(my_size * array){
 // }
 
 // by far the best
-// void transpose_array_old(my_size *array) {
-//     int block_sz_i = 2; // Pick a suitable block size
-//     int block_sz_j = 1; // Pick a suitable block size
-//     for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
-//         for (int bj = 0; bj < ARRAY_SZ; bj += block_sz_j) {
-//             for (int i = bi; i < bi + block_sz_i && i < TRANSPOSE_SZ; ++i) {
-//                 for (int j = bj; j < bj + block_sz_j && j < ARRAY_SZ; ++j) {
-//                     store_bit(&transpose_array[i][j / TRANSPOSE_SZ], j % TRANSPOSE_SZ, get_bit(&array[j], i));
-//                 }
-//             }
-//         }
-//     }
-// }
+void transpose_array_old(my_size *array) {
+    int block_sz_i = 4; // Pick a suitable block size
+    int block_sz_j = 2; // Pick a suitable block size
+    for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
+        for (int bj = 0; bj < ARRAY_SZ; bj += block_sz_j) {
+            for (int i = bi; i < bi + block_sz_i && i < TRANSPOSE_SZ; ++i) {
+                for (int j = bj; j < bj + block_sz_j && j < ARRAY_SZ; j+=1) {
+                    if(get_bit(&array[j], i)){
+                        store_bit(&transpose_array[i][j / TRANSPOSE_SZ], j % TRANSPOSE_SZ, 1);
+                    }
+                }
+            }
+        }
+    }
+}
 // void transpose_array_old(my_size *array) {
 //     int block_sz_i = 2; // Pick a suitable block size
 //     for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
