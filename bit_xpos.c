@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <openssl/md5.h>
-// #include <xmmintrin.h> // for _mm_prefetch
+#include <xmmintrin.h> // for _mm_prefetch
 
 #define ARRAY_SZ 1048576 * 8
 #define TRANSPOSE_SZ 64
@@ -188,12 +188,17 @@ void transpose_array_new(my_size * array){
 //     }
 // }
 
+#define PREFETCH_DISTANCE (64)
 // by far the best
 void transpose_array_old(my_size *array) {
     int block_sz_i = 4; // Pick a suitable block size
     int block_sz_j = 2; // Pick a suitable block size
+
     for (int bi = 0; bi < TRANSPOSE_SZ; bi += block_sz_i) {
         for (int bj = 0; bj < ARRAY_SZ; bj += block_sz_j) {
+            if (bi + PREFETCH_DISTANCE / TRANSPOSE_SZ < TRANSPOSE_SZ) {
+                _mm_prefetch((const char*)&transpose_array[bi][(bj / TRANSPOSE_SZ) + (PREFETCH_DISTANCE / TRANSPOSE_SZ)], _MM_HINT_T0);
+            }
             for (int i = bi; i < bi + block_sz_i && i < TRANSPOSE_SZ; ++i) {
                 for (int j = bj; j < bj + block_sz_j && j < ARRAY_SZ; j+=1) {
                     if(get_bit(&array[j], i)){
