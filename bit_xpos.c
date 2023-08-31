@@ -5,7 +5,10 @@
 #include <openssl/md5.h>
 #include <xmmintrin.h> // for _mm_prefetch
 
-#define ARRAY_SZ 1048576 * 8
+#include <omp.h>
+
+
+#define ARRAY_SZ 1048576 * 4
 #define TRANSPOSE_SZ 64
 typedef uint64_t my_size; 
 
@@ -48,10 +51,16 @@ inline void store_bit(my_size *num_ptr, int i, my_size bit_val) {
     // Set the i-th bit to bit_val
     *num_ptr |= (bit_val << i);
 }
-
+#define USE_OMP 1
 // This has an access pattern that should be better for the last level cache
 // We measure it to be 
+#if USE_OMP
+#define PARALLEL 32
+#endif
 void transpose_array_new(my_size * array){
+    #if USE_OMP
+        #pragma omp parallel for num_threads(PARALLEL) schedule(static, ARRAY_SZ/PARALLEL)
+    #endif
     for (int i = 0; i < ARRAY_SZ; i++) {
         for (int j = 0; j < TRANSPOSE_SZ; j++) {
                 store_bit(&transpose_array[j][i/TRANSPOSE_SZ], i%TRANSPOSE_SZ, get_bit(&array[i], j));
@@ -59,8 +68,8 @@ void transpose_array_new(my_size * array){
     }
 }
 
-#define PREFETCH_DISTANCE (64)
-// // by far the best
+// #define PREFETCH_DISTANCE (64)
+// // // by far the best
 void transpose_array_old(my_size *array) {
     int block_sz_i = 4; // Pick a suitable block size
     int block_sz_j = 2; // Pick a suitable block size
@@ -81,15 +90,17 @@ void transpose_array_old(my_size *array) {
         }
     }
 }
-
-// void transpose_array_old(my_size * array){
-//     // outer loop over bits, inner loop over array elements
-//     for (int i = 0; i < TRANSPOSE_SZ; i++) {
-//         for (int j = 0; j < ARRAY_SZ; j++) {
-//                 store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, get_bit(&array[j], i));
-//         }
-//     }
-// }
+void transpose_array_old(my_size * array){
+    // outer loop over bits, inner loop over array elements
+    #if USE_OMP
+    #pragma omp parallel for num_threads(PARALLEL) schedule(static, TRANSPOSE_SZ/PARALLEL)
+    #endif
+    for (int i = 0; i < TRANSPOSE_SZ; i++) {
+        for (int j = 0; j < ARRAY_SZ; j++) {
+                store_bit(&transpose_array[i][j/TRANSPOSE_SZ], j%TRANSPOSE_SZ, get_bit(&array[j], i));
+        }
+    }
+}
 
 // This was a shot in the dark, didn't really expect it to work
 // void transpose_array_new(my_size * array){

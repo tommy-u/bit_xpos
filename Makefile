@@ -1,13 +1,14 @@
 SRC=bit_xpos.c
 EXEC=bit_xpos
 CFLAGS=-g -O3 -march=native
+LIBS=-lcrypto -fopenmp
 
 NUMA_CTL=numactl --cpunodebind=0 --membind=0
 
 PERF_CACHE_FLAGS=-e L1-dcache-load-misses,L1-dcache-loads,L1-dcache-stores,L1-icache-load-misses,LLC-load-misses,LLC-loads,LLC-store-misses,LLC-stores
 
 $(EXEC): $(SRC)
-	gcc $(CFLAGS) -o $@ $< -lcrypto
+	gcc $(CFLAGS) $(LIBS) -o $@ $<
 # gcc -march=native -O3 -o $@ $<
 # gcc -march=native -Ofast -o $@ $<
 # gcc -g -O3 -o $@ $< -lcrypto
